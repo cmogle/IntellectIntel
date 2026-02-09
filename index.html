@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intellect Intelligence — Share Prices</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; height: 100vh; }
+  .grid > div { min-height: 200px; }
+  @media (max-width: 768px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div id="chart1"></div>
+  <div id="chart2"></div>
+  <div id="chart3"></div>
+  <div id="chart4"></div>
+  <div id="chart5"></div>
+  <div id="chart6"></div>
+</div>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+const stocks = [
+  { container: "chart1", symbol: "NSE:INTELLECT", name: "Intellect Design Arena" },
+  { container: "chart2", symbol: "SIX:TEMN",      name: "Temenos" },
+  { container: "chart3", symbol: "NSE:INFY",      name: "Infosys" },
+  { container: "chart4", symbol: "NSE:TCS",       name: "TCS" },
+  { container: "chart5", symbol: "NYSE:ORCL",     name: "Oracle" },
+  { container: "chart6", symbol: "NYSE:FI",       name: "Fiserv" }
+];
+stocks.forEach(s => {
+  new TradingView.MediumWidget({
+    symbols: [[s.name, s.symbol]],
+    chartOnly: false,
+    width: "100%",
+    height: "100%",
+    locale: "en",
+    colorTheme: "light",
+    autosize: true,
+    showVolume: false,
+    showMA: false,
+    hideDateRanges: false,
+    hideMarketStatus: false,
+    hideSymbolLogo: false,
+    scalePosition: "right",
+    scaleMode: "Normal",
+    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+    fontSize: "10",
+    noTimeScale: false,
+    valuesTracking: "1",
+    changeMode: "price-and-percent",
+    chartType: "area",
+    lineColor: "#2962FF",
+    bottomColor: "rgba(41, 98, 255, 0.0)",
+    topColor: "rgba(41, 98, 255, 0.15)",
+    container_id: s.container,
+    dateRange: "12M"
+  });
+});
+</script>
+</body>
+</html>
