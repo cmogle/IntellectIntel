@@ -4,62 +4,175 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Intellect Intelligence — Share Prices</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; height: 100vh; }
-  .grid > div { min-height: 200px; }
-  @media (max-width: 768px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  body { background: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 16px; }
+  h1 { font-size: 18px; color: #1a1a2e; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { border: 1px solid #e8e8e8; border-radius: 12px; padding: 16px; background: #fafafa; }
+  .card-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .ticker-name { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+  .ticker-exchange { font-size: 11px; color: #999; }
+  .price { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+  .change { font-size: 13px; font-weight: 500; margin-left: 8px; }
+  .change.up { color: #00c853; }
+  .change.down { color: #ff1744; }
+  .price-row { display: flex; align-items: baseline; margin-bottom: 8px; }
+  .chart-container { height: 120px; }
+  .loading { color: #aaa; font-size: 12px; text-align: center; padding: 40px 0; }
+  .error { color: #ff1744; font-size: 11px; text-align: center; padding: 10px 0; }
+  .updated { font-size: 10px; color: #bbb; margin-top: 4px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<div class="grid">
-  <div id="chart1"></div>
-  <div id="chart2"></div>
-  <div id="chart3"></div>
-  <div id="chart4"></div>
-  <div id="chart5"></div>
-  <div id="chart6"></div>
-</div>
-<script src="https://s3.tradingview.com/tv.js"></script>
+<h1>📈 Intellect Intelligence — Share Prices</h1>
+<p class="subtitle">12-month view • Auto-refreshes every 15 minutes</p>
+<div class="grid" id="grid"></div>
 <script>
 const stocks = [
-  { container: "chart1", symbol: "NSE:INTELLECT", name: "Intellect Design Arena" },
-  { container: "chart2", symbol: "SIX:TEMN",      name: "Temenos" },
-  { container: "chart3", symbol: "NSE:INFY",      name: "Infosys" },
-  { container: "chart4", symbol: "NSE:TCS",       name: "TCS" },
-  { container: "chart5", symbol: "NYSE:ORCL",     name: "Oracle" },
-  { container: "chart6", symbol: "NYSE:FI",       name: "Fiserv" }
+  { symbol: "INTELLECT.NS", name: "Intellect Design Arena", exchange: "NSE" },
+  { symbol: "TEMN.SW", name: "Temenos", exchange: "SIX" },
+  { symbol: "INFY.NS", name: "Infosys", exchange: "NSE" },
+  { symbol: "TCS.NS", name: "TCS", exchange: "NSE" },
+  { symbol: "ORCL", name: "Oracle", exchange: "NYSE" },
+  { symbol: "FI", name: "Fiserv", exchange: "NYSE" },
 ];
-stocks.forEach(s => {
-  new TradingView.MediumWidget({
-    symbols: [[s.name, s.symbol]],
-    chartOnly: false,
-    width: "100%",
-    height: "100%",
-    locale: "en",
-    colorTheme: "light",
-    autosize: true,
-    showVolume: false,
-    showMA: false,
-    hideDateRanges: false,
-    hideMarketStatus: false,
-    hideSymbolLogo: false,
-    scalePosition: "right",
-    scaleMode: "Normal",
-    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-    fontSize: "10",
-    noTimeScale: false,
-    valuesTracking: "1",
-    changeMode: "price-and-percent",
-    chartType: "area",
-    lineColor: "#2962FF",
-    bottomColor: "rgba(41, 98, 255, 0.0)",
-    topColor: "rgba(41, 98, 255, 0.15)",
-    container_id: s.container,
-    dateRange: "12M"
+
+const CORS_PROXY = "https://corsproxy.io/?url=";
+
+async function fetchStock(stock) {
+  const url = `${CORS_PROXY}${encodeURIComponent(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${stock.symbol}?range=1y&interval=1d`
+  )}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const result = data.chart.result[0];
+  const meta = result.meta;
+  const timestamps = result.timestamp;
+  const closes = result.indicators.quote[0].close;
+  
+  const points = timestamps.map((t, i) => ({
+    x: new Date(t * 1000),
+    y: closes[i]
+  })).filter(p => p.y !== null);
+
+  const currentPrice = meta.regularMarketPrice;
+  const prevClose = meta.chartPreviousClose;
+  const change = currentPrice - prevClose;
+  const changePct = (change / prevClose) * 100;
+  const yearStart = points[0]?.y || prevClose;
+  const yearChange = ((currentPrice - yearStart) / yearStart) * 100;
+
+  return {
+    ...stock,
+    price: currentPrice,
+    currency: meta.currency,
+    change,
+    changePct,
+    yearChange,
+    points
+  };
+}
+
+function formatPrice(price, currency) {
+  const symbols = { INR: "₹", USD: "$", CHF: "CHF ", EUR: "€", GBP: "£" };
+  const prefix = symbols[currency] || currency + " ";
+  return prefix + price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function createCard(stock) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = `card-${stock.symbol}`;
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="ticker-name">${stock.name}</span>
+      <span class="ticker-exchange">${stock.exchange}</span>
+    </div>
+    <div class="loading">Loading...</div>
+  `;
+  return card;
+}
+
+function renderCard(card, data) {
+  const isUp = data.changePct >= 0;
+  const yearUp = data.yearChange >= 0;
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="ticker-name">${data.name}</span>
+      <span class="ticker-exchange">${data.exchange}</span>
+    </div>
+    <div class="price-row">
+      <span class="price">${formatPrice(data.price, data.currency)}</span>
+      <span class="change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${Math.abs(data.changePct).toFixed(2)}% today</span>
+    </div>
+    <div style="font-size:11px;color:${yearUp ? '#00c853' : '#ff1744'};margin-bottom:8px">
+      ${yearUp ? '↑' : '↓'} ${Math.abs(data.yearChange).toFixed(1)}% over 12 months
+    </div>
+    <div class="chart-container"><canvas id="chart-${data.symbol}"></canvas></div>
+  `;
+  
+  const ctx = document.getElementById(`chart-${data.symbol}`).getContext("2d");
+  const gradient = ctx.createLinearGradient(0, 0, 0, 120);
+  const color = yearUp ? "41, 98, 255" : "255, 23, 68";
+  gradient.addColorStop(0, `rgba(${color}, 0.15)`);
+  gradient.addColorStop(1, `rgba(${color}, 0)`);
+
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      datasets: [{
+        data: data.points,
+        borderColor: `rgba(${color}, 1)`,
+        backgroundColor: gradient,
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: { type: "time", display: false },
+        y: { display: false }
+      },
+      animation: false
+    }
   });
-});
+}
+
+async function init() {
+  const grid = document.getElementById("grid");
+  const cards = {};
+  
+  for (const stock of stocks) {
+    const card = createCard(stock);
+    grid.appendChild(card);
+    cards[stock.symbol] = card;
+  }
+
+  for (const stock of stocks) {
+    try {
+      const data = await fetchStock(stock);
+      renderCard(cards[stock.symbol], data);
+    } catch (e) {
+      cards[stock.symbol].querySelector(".loading").innerHTML = 
+        `<div class="error">Unable to load ${stock.symbol}</div>`;
+      console.error(stock.symbol, e);
+    }
+  }
+}
+
+init();
+setInterval(() => location.reload(), 15 * 60 * 1000);
 </script>
 </body>
 </html>
